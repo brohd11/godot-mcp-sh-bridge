@@ -9,7 +9,7 @@ It has no dependencies. The commands come from a host, which is any object with
 `host_commands()`, `host_help(name)` and `host_run(argv, stdin)`, such as a `GDSh.Host`.
 
 - [Editor Console](https://github.com/brohd11/Godot-Editor-Console) requires it and serves the
-  console's commands when `plugin/editor_console/serve_mcp_sh_bridge` is on.
+  console's commands after `mcp --start` (add it to the console's startup commands).
 - mcp-sh-godot's editor addon uses it to serve plain gdsh in projects without Editor Console.
 - A game adds the node itself:
 

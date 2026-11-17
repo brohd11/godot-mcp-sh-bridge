@@ -9,16 +9,14 @@ extends RefCounted
 const Bridge = preload("res://addons/_lib/mcp_sh_bridge/src/bridge.gd")
 const FILE_NAME = "bridge.json"
 
-const KEYS = ["port", "token", "autostart", "editorConsole", "gdshLib", "commandDirs", "commands", "exclude", "include", "maxRequestBytes", "maxConnections", "idleTimeoutMs"]
+const KEYS = ["port", "token", "autostart", "gdshLib", "commandDirs", "commands", "exclude", "include", "maxRequestBytes", "maxConnections", "idleTimeoutMs"]
 
 ## 0: the bridge's default for where it runs (9510 in the editor). -1: any free port.
 var port:int = 0
 var token:String = ""
-## The mcp-sh-godot plugin's keys. Editor Console uses its own editor setting instead.
+## The mcp-sh-godot addon's keys; Editor Console starts with `mcp --start` instead.
 ## Start listening when the plugin is enabled. Otherwise use Project > Tools.
 var autostart:bool = true
-## Leave serving to Editor Console when it is.
-var editor_console:bool = true
 ## Expose gdsh_lib's tree and utils commands when installed.
 var gdsh_lib:bool = true
 ## gdsh command directories and single command scripts by name, added to the host.
@@ -101,8 +99,6 @@ func _apply_file(path:String) -> void:
 		token = str(data.token)
 	if data.has("autostart"):
 		autostart = bool(data.autostart)
-	if data.has("editorConsole"):
-		editor_console = bool(data.editorConsole)
 	if data.has("gdshLib"):
 		gdsh_lib = bool(data.gdshLib)
 	if data.has("maxRequestBytes"):
