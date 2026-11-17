@@ -17,6 +17,9 @@ extends Node
 ## with exact args and piped stdin.
 
 const PROTOCOL = 1
+## For the version in hello. An export copies it beside this script under another name, so the
+## copy isn't taken for a package of its own.
+const PACKAGE_CFG = "res://addons/_lib/mcp_sh_bridge/package.cfg" #! gdp-dependency ./bridge_package.cfg
 const EDITOR_PORT = 9510
 const RUNTIME_PORT = 9511
 const NO_HOST = "no commands to serve: the bridge has no host and gdsh is not installed"
@@ -135,12 +138,10 @@ func is_excluded(name:String) -> bool:
 	return name in exclude and not name in include
 
 
-## The package's version, from the package.cfg beside src/. Found relative to this script so
-## it still resolves once an exporter bundles the package somewhere else.
+## The package's version, from its package.cfg.
 func bridge_version() -> String:
 	var cfg = ConfigFile.new()
-	var path = (get_script() as Script).resource_path.get_base_dir().get_base_dir().path_join("package.cfg")
-	if cfg.load(path) != OK:
+	if cfg.load(PACKAGE_CFG) != OK:
 		return "unknown"
 	return str(cfg.get_value("package", "version", "unknown"))
 
