@@ -1,0 +1,35 @@
+export_root: "res://addons/_lib/mcp_sh_bridge/_export_ignore/exports"
+plugin_folder: "McpShBridge{{version=res://addons/_lib/mcp_sh_bridge}}"
+pre_script: ""
+post_script: ""
+external: []
+options:
+  overwrite: true
+  include_uid: true
+  include_import: true
+  ignore_src: false
+  ignore_tests: true
+  use_tag_in_cfg: true
+  include_min_version: true
+  move_global_files: false
+  include_docs: true
+  include_project_license: false
+  parser_settings:
+    use_relative_paths: false
+    parse_cs:
+      namespace_rename: {}
+    parse_gd:
+      optimizer:
+        struct_mode: tagged
+        inline_mode: tagged
+        aggressive: false
+        debug_tags: false
+        enabled: false
+      class_rename_ignore: []
+    parse_tscn: {}
+    parse_tres: {}
+exports:
+  -
+    source: "res://addons/_lib/mcp_sh_bridge"
+    export_name: "mcp-sh-bridge{{version=res://addons/_lib/mcp_sh_bridge}}"
+    export_folder: addons/_lib/mcp_sh_bridge
