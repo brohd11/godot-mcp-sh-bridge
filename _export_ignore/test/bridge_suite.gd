@@ -214,17 +214,36 @@ func test_config_keys():
 
 
 ## A layer's commands/ folder is read without config when it exists, ahead of its commandDirs.
+## Records the directories a config adds.
+class DirRecorder:
+	extends RefCounted
+	var dirs := PackedStringArray()
+
+	func add_command_dir(dir: String) -> void:
+		dirs.append(dir)
+
+	func add_command(_path: String, _name: String = "") -> void:
+		pass
+
+
+func _dirs_added(cfg, command_folders: bool) -> PackedStringArray:
+	var host := DirRecorder.new()
+	cfg.add_commands_to(host, command_folders)
+	return host.dirs
+
+
 func test_commands_folder():
 	var root := ProjectSettings.globalize_path("user://mcp_sh_bridge_test_cfg")
 	var commands := root.path_join("godot").path_join(BridgeConfig.COMMANDS_DIR)
+	var lib := root.path_join("godot").path_join("lib")
 	var previous := OS.get_environment("MCP_SH_CONFIG_DIR")
 	OS.set_environment("MCP_SH_CONFIG_DIR", root)
-	var missing: PackedStringArray = BridgeConfig.load_config().command_dirs
+	var missing := _dirs_added(BridgeConfig.load_config(), true)
 	DirAccess.make_dir_recursive_absolute(commands)
 	var file := FileAccess.open(root.path_join("godot").path_join(BridgeConfig.FILE_NAME), FileAccess.WRITE)
 	file.store_string(JSON.stringify({"commandDirs": ["lib"]}))
 	file.close()
-	var found: PackedStringArray = BridgeConfig.load_config().command_dirs
+	var cfg = BridgeConfig.load_config()
 	OS.set_environment("MCP_SH_CONFIG_DIR", previous)
 	DirAccess.remove_absolute(root.path_join("godot").path_join(BridgeConfig.FILE_NAME))
 	DirAccess.remove_absolute(commands)
@@ -232,9 +251,14 @@ func test_commands_folder():
 	DirAccess.remove_absolute(root)
 	if commands in missing:
 		return "a missing commands folder was added: %s" % missing
-	var lib := root.path_join("godot").path_join("lib")
-	if found.find(commands) != 0 or found.find(lib) != 1:
-		return "expected the commands folder, then commandDirs: %s" % found
+	var plain := _dirs_added(cfg, false)
+	if plain != PackedStringArray([lib]):
+		return "without command_folders only commandDirs are added: %s" % plain
+	var with_folders := _dirs_added(cfg, true)
+	if with_folders != PackedStringArray([commands, lib]):
+		return "with command_folders, the commands folder comes before commandDirs: %s" % with_folders
+	if cfg.command_dirs != PackedStringArray([lib]):
+		return "command_dirs holds only bridge.json's commandDirs: %s" % cfg.command_dirs
 	return ""
 
 

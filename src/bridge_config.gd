@@ -5,9 +5,10 @@ extends RefCounted
 ##   project: res://.mcp-sh/godot/bridge.json
 ## These sit beside mcp-sh-godot's own config. Scalars replace earlier layers. `commandDirs`
 ## and `exclude` add to them. `commands` merges by name.
-## Each layer's `commands/` folder is read first when it exists, as mcp-sh reads its own:
-##   $MCP_SH_CONFIG_DIR/godot/commands, then res://.mcp-sh/godot/commands
-## so gdsh commands dropped there need no config.
+## Each layer's `commands/` folder (when it exists) comes before its commandDirs, as mcp-sh
+## reads its own: $MCP_SH_CONFIG_DIR/godot/commands, then res://.mcp-sh/godot/commands, so gdsh
+## commands dropped there need no config. Only hosts that ask get them, with
+## add_commands_to(host, true): the editor plugins do; a game's own bridge doesn't.
 
 const Bridge = preload("res://addons/_lib/mcp_sh_bridge/src/bridge.gd")
 const FILE_NAME = "bridge.json"
@@ -24,7 +25,7 @@ var token:String = ""
 var autostart:bool = true
 ## Expose gdsh_lib's tree and utils commands when installed.
 var gdsh_lib:bool = true
-## gdsh command directories and single command scripts by name, added to the host.
+## bridge.json's gdsh command directories and single command scripts by name, added to the host.
 var command_dirs:PackedStringArray = []
 var commands:Dictionary = {}
 ## Names never offered (the bridge's defaults plus these), and names taken back out.
@@ -36,6 +37,8 @@ var max_connections:int = 8
 var idle_timeout_ms:int = 10000
 ## Files that were read, in order, for the startup message.
 var sources:PackedStringArray = []
+## Every directory in the order the host gets them: [path, is a commands/ folder].
+var _dirs:Array = []
 
 
 static func load_config():
@@ -47,7 +50,7 @@ static func load_config():
 	for path in [user_path(), project_path()]:
 		var commands_dir = path.get_base_dir().path_join(COMMANDS_DIR)
 		if DirAccess.dir_exists_absolute(commands_dir):
-			cfg.command_dirs.append(commands_dir)
+			cfg._dirs.append([commands_dir, true])
 		cfg._apply_file(path)
 	return cfg
 
@@ -63,12 +66,14 @@ func apply_to(bridge) -> void:
 	bridge.idle_timeout_ms = idle_timeout_ms
 
 
-## Add `commandDirs` and `commands` to a GDSh.Host. Returns the host; null stays null.
-func add_commands_to(host):
+## Add `commandDirs` and `commands` to a GDSh.Host, and with command_folders the `commands/`
+## folders beside each config file too. Returns the host; null stays null.
+func add_commands_to(host, command_folders:=false):
 	if host == null:
 		return null
-	for dir in command_dirs:
-		host.add_command_dir(dir)
+	for entry in _dirs:
+		if command_folders or not entry[1]:
+			host.add_command_dir(entry[0])
 	for name in commands:
 		host.add_command(commands[name], name)
 	return host
@@ -116,7 +121,9 @@ func _apply_file(path:String) -> void:
 	if data.has("idleTimeoutMs"):
 		idle_timeout_ms = int(data.idleTimeoutMs)
 	for dir in data.get("commandDirs", []):
-		command_dirs.append(_resolve(str(dir), base))
+		var resolved = _resolve(str(dir), base)
+		command_dirs.append(resolved)
+		_dirs.append([resolved, false])
 	var cmds = data.get("commands", {})
 	if cmds is Dictionary:
 		for name in cmds:
