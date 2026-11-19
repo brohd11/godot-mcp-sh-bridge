@@ -7,7 +7,8 @@ const BridgeConfig = preload("res://addons/_lib/mcp_sh_bridge/src/bridge_config.
 
 const TESTS = ["test_hello_and_invoke", "test_wrong_token", "test_free_port", "test_split_utf8",
 		"test_oversized_request", "test_idle_connection", "test_connection_flood",
-		"test_config_keys", "test_commands_folder", "test_apply_to"]
+		"test_config_keys", "test_commands_folder", "test_apply_to", "test_cancel_options",
+		"test_client_disconnect"]
 
 var tree: SceneTree
 var bridge: Node
@@ -26,6 +27,34 @@ class FakeHost:
 
 	func host_run(argv: Array, stdin: String = "") -> Dictionary:
 		return {"stdout": " ".join(argv.slice(1)) + stdin, "stderr": "", "exit_code": 0}
+
+
+## A host with cancellation support: keeps the opts it was given and, for `spin`, runs until
+## cancel_check gives a reason (or 5 s pass).
+class CancelHost:
+	extends RefCounted
+	var opts := {}
+	var reason := ""
+
+	func host_commands() -> Array:
+		return [{"name": "spin", "summary": "run until cancelled"}]
+
+	func host_help(_name: String) -> String:
+		return ""
+
+	func host_run(argv: Array, _stdin: String = "", run_opts: Dictionary = {}) -> Dictionary:
+		opts = run_opts
+		if argv.size() > 1 and argv[1] == "quick":
+			return {"stdout": "ok", "stderr": "", "exit_code": 0}
+		var check = run_opts.get("cancel_check")
+		var start := Time.get_ticks_msec()
+		while Time.get_ticks_msec() - start < 5000:
+			if check is Callable:
+				reason = check.call()
+				if not reason.is_empty():
+					break
+			await (Engine.get_main_loop() as SceneTree).process_frame
+		return {"stdout": "", "stderr": reason, "exit_code": 130}
 
 
 func _init(scene_tree: SceneTree) -> void:
@@ -272,3 +301,45 @@ func test_apply_to():
 	var got := [other.token, other.max_connections, other.is_excluded("echo"), other.is_excluded("os")]
 	other.free()
 	return "" if got == ["t", 2, false, true] else "applied %s" % str(got)
+
+
+## timeout_ms and max_output reach a host that takes opts, with a disconnect check; none are
+## made up when the request doesn't send them.
+func test_cancel_options():
+	var host := CancelHost.new()
+	bridge.host = host
+	var out := await request([line({"id": 1, "token": "secret", "method": "invoke", "cmd": "spin", "args": ["quick"], "timeout_ms": 1500, "max_output": 99})])
+	if out.get("stdout") != "ok":
+		return "invoke: %s" % out
+	if host.opts.get("timeout_ms") != 1500 or host.opts.get("max_output") != 99 or not host.opts.get("cancel_check") is Callable:
+		return "opts: %s" % host.opts
+	await request([line({"id": 2, "token": "secret", "method": "invoke", "cmd": "spin", "args": ["quick"]})])
+	if host.opts.has("timeout_ms") or host.opts.has("max_output"):
+		return "defaults should add no limits: %s" % host.opts
+	return ""
+
+
+## The client hanging up mid-command is what mcp-sh does on timeout; the host's check sees it.
+func test_client_disconnect():
+	var host := CancelHost.new()
+	bridge.host = host
+	var peer := StreamPeerTCP.new()
+	peer.connect_to_host("127.0.0.1", bridge.get_port())
+	var start := Time.get_ticks_msec()
+	var sent := false
+	while Time.get_ticks_msec() - start < 3000:
+		peer.poll()
+		if not sent and peer.get_status() == StreamPeerTCP.STATUS_CONNECTED:
+			peer.put_data(line({"id": 1, "token": "secret", "method": "invoke", "cmd": "spin"}).to_utf8_buffer())
+			sent = true
+			start = Time.get_ticks_msec()
+		elif sent and Time.get_ticks_msec() - start > 200:
+			break
+		await tree.process_frame
+	peer.disconnect_from_host()
+	var gone := Time.get_ticks_msec()
+	while host.reason.is_empty() and Time.get_ticks_msec() - gone < 3000:
+		await tree.process_frame
+	if host.reason != "client disconnected":
+		return "host never saw the disconnect (reason %s)" % [host.reason if not host.reason.is_empty() else "none"]
+	return ""
