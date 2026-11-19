@@ -7,7 +7,7 @@ const BridgeConfig = preload("res://addons/_lib/mcp_sh_bridge/src/bridge_config.
 
 const TESTS = ["test_hello_and_invoke", "test_wrong_token", "test_free_port", "test_split_utf8",
 		"test_oversized_request", "test_idle_connection", "test_connection_flood",
-		"test_config_keys", "test_apply_to"]
+		"test_config_keys", "test_commands_folder", "test_apply_to"]
 
 var tree: SceneTree
 var bridge: Node
@@ -210,6 +210,31 @@ func test_config_keys():
 		return "commandDirs not resolved against the file: %s" % cfg.command_dirs
 	if not "extra" in cfg.exclude or not "os" in cfg.exclude:
 		return "exclude should add to the defaults: %s" % cfg.exclude
+	return ""
+
+
+## A layer's commands/ folder is read without config when it exists, ahead of its commandDirs.
+func test_commands_folder():
+	var root := ProjectSettings.globalize_path("user://mcp_sh_bridge_test_cfg")
+	var commands := root.path_join("godot").path_join(BridgeConfig.COMMANDS_DIR)
+	var previous := OS.get_environment("MCP_SH_CONFIG_DIR")
+	OS.set_environment("MCP_SH_CONFIG_DIR", root)
+	var missing: PackedStringArray = BridgeConfig.load_config().command_dirs
+	DirAccess.make_dir_recursive_absolute(commands)
+	var file := FileAccess.open(root.path_join("godot").path_join(BridgeConfig.FILE_NAME), FileAccess.WRITE)
+	file.store_string(JSON.stringify({"commandDirs": ["lib"]}))
+	file.close()
+	var found: PackedStringArray = BridgeConfig.load_config().command_dirs
+	OS.set_environment("MCP_SH_CONFIG_DIR", previous)
+	DirAccess.remove_absolute(root.path_join("godot").path_join(BridgeConfig.FILE_NAME))
+	DirAccess.remove_absolute(commands)
+	DirAccess.remove_absolute(root.path_join("godot"))
+	DirAccess.remove_absolute(root)
+	if commands in missing:
+		return "a missing commands folder was added: %s" % missing
+	var lib := root.path_join("godot").path_join("lib")
+	if found.find(commands) != 0 or found.find(lib) != 1:
+		return "expected the commands folder, then commandDirs: %s" % found
 	return ""
 
 

@@ -5,9 +5,14 @@ extends RefCounted
 ##   project: res://.mcp-sh/godot/bridge.json
 ## These sit beside mcp-sh-godot's own config. Scalars replace earlier layers. `commandDirs`
 ## and `exclude` add to them. `commands` merges by name.
+## Each layer's `commands/` folder is read first when it exists, as mcp-sh reads its own:
+##   $MCP_SH_CONFIG_DIR/godot/commands, then res://.mcp-sh/godot/commands
+## so gdsh commands dropped there need no config.
 
 const Bridge = preload("res://addons/_lib/mcp_sh_bridge/src/bridge.gd")
 const FILE_NAME = "bridge.json"
+## Read from beside each config file without being listed.
+const COMMANDS_DIR = "commands"
 
 const KEYS = ["port", "token", "autostart", "gdshLib", "commandDirs", "commands", "exclude", "include", "maxRequestBytes", "maxConnections", "idleTimeoutMs"]
 
@@ -40,6 +45,9 @@ static func load_config():
 		cfg.port = env_port.to_int()
 	cfg.token = OS.get_environment("MCP_SH_GODOT_TOKEN")
 	for path in [user_path(), project_path()]:
+		var commands_dir = path.get_base_dir().path_join(COMMANDS_DIR)
+		if DirAccess.dir_exists_absolute(commands_dir):
+			cfg.command_dirs.append(commands_dir)
 		cfg._apply_file(path)
 	return cfg
 
