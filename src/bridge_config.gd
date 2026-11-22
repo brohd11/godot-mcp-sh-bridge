@@ -15,7 +15,7 @@ const FILE_NAME = "bridge.json"
 ## A root's loose-command folder, for gdsh copies without add_command_root.
 const COMMANDS_DIR = "commands"
 
-const KEYS = ["port", "token", "autostart", "gdshLib", "commandDirs", "commands", "exclude", "include", "maxRequestBytes", "maxConnections", "idleTimeoutMs", "newCommands"]
+const KEYS = ["port", "token", "autostart", "gdshLib", "commandDirs", "commands", "exclude", "include", "maxRequestBytes", "maxConnections", "idleTimeoutMs", "gdshRoot"]
 
 ## 0: the bridge's default for where it runs (9510 in the editor). -1: any free port.
 var port:int = 0

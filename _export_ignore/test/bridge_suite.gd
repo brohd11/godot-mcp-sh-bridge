@@ -291,7 +291,7 @@ func test_command_roots():
 	var before := _dirs_added(BridgeConfig.load_config(), true)
 	DirAccess.make_dir_recursive_absolute(commands)
 	var file := FileAccess.open(layer.path_join(BridgeConfig.FILE_NAME), FileAccess.WRITE)
-	file.store_string(JSON.stringify({"commandDirs": ["lib"], "newCommands": "gdsh"}))
+	file.store_string(JSON.stringify({"commandDirs": ["lib"], "gdshRoot": "gdsh"}))
 	file.close()
 	var cfg = BridgeConfig.load_config()
 	OS.set_environment("MCP_SH_CONFIG_DIR", previous)
