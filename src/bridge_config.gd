@@ -8,7 +8,8 @@ extends RefCounted
 ## Each layer's `commands/` folder (when it exists) comes before its commandDirs, as mcp-sh
 ## reads its own: $MCP_SH_CONFIG_DIR/godot/commands, then res://.mcp-sh/godot/commands, so gdsh
 ## commands dropped there need no config. Only hosts that ask get them, with
-## add_commands_to(host, true): the editor plugins do; a game's own bridge doesn't.
+## add_commands_to(host, true): the editor plugins do; a game's own bridge doesn't. Those hosts
+## also get gdsh's shared ~/.gdsh and res://.gdsh folders (GDSh.Load.default_dirs) first.
 
 const Bridge = preload("res://addons/_lib/mcp_sh_bridge/src/bridge.gd")
 const FILE_NAME = "bridge.json"
@@ -71,6 +72,9 @@ func apply_to(bridge) -> void:
 func add_commands_to(host, command_folders:=false):
 	if host == null:
 		return null
+	# Before the layers, so bridge.json wins a name clash. Older gdsh copies lack it.
+	if command_folders and host.has_method("add_default_dirs"):
+		host.add_default_dirs()
 	for entry in _dirs:
 		if command_folders or not entry[1]:
 			host.add_command_dir(entry[0])

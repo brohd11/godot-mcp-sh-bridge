@@ -32,7 +32,8 @@ func _ready():
 `src/bridge_config.gd` reads mcp-sh-godot's `bridge.json` (user file, then project file).
 `apply_to(bridge)` copies the listener settings, and `add_commands_to(host)` adds
 `commandDirs`/`commands`. `add_commands_to(host, true)` also adds each layer's `commands/`
-folder (`~/.mcp-sh/godot/commands`, `res://.mcp-sh/godot/commands`) when it exists. Editor
+folder (`~/.mcp-sh/godot/commands`, `res://.mcp-sh/godot/commands`) when it exists, after
+gdsh's shared `~/.gdsh` and `res://.gdsh` folders (`host.add_default_dirs()`). Editor
 Console and the mcp-sh-godot addon pass `true`; a game serving its own commands leaves it off,
 so it never picks up the user's. The keys are documented in the mcp-sh-godot README.
 

@@ -248,6 +248,9 @@ class DirRecorder:
 	extends RefCounted
 	var dirs := PackedStringArray()
 
+	func add_default_dirs() -> void:
+		dirs.append("<defaults>")
+
 	func add_command_dir(dir: String) -> void:
 		dirs.append(dir)
 
@@ -284,8 +287,8 @@ func test_commands_folder():
 	if plain != PackedStringArray([lib]):
 		return "without command_folders only commandDirs are added: %s" % plain
 	var with_folders := _dirs_added(cfg, true)
-	if with_folders != PackedStringArray([commands, lib]):
-		return "with command_folders, the commands folder comes before commandDirs: %s" % with_folders
+	if with_folders != PackedStringArray(["<defaults>", commands, lib]):
+		return "with command_folders, gdsh's shared dirs, then the commands folder, then commandDirs: %s" % with_folders
 	if cfg.command_dirs != PackedStringArray([lib]):
 		return "command_dirs holds only bridge.json's commandDirs: %s" % cfg.command_dirs
 	return ""
