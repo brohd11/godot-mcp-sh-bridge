@@ -7,7 +7,7 @@ const BridgeConfig = preload("res://addons/_lib/mcp_sh_bridge/src/bridge_config.
 
 const TESTS = ["test_hello_and_invoke", "test_wrong_token", "test_free_port", "test_split_utf8",
 		"test_oversized_request", "test_idle_connection", "test_connection_flood",
-		"test_config_keys", "test_commands_folder", "test_apply_to", "test_cancel_options",
+		"test_config_keys", "test_command_roots", "test_apply_to", "test_cancel_options",
 		"test_client_disconnect"]
 
 var tree: SceneTree
@@ -242,14 +242,17 @@ func test_config_keys():
 	return ""
 
 
-## A layer's commands/ folder is read without config when it exists, ahead of its commandDirs.
-## Records the directories a config adds.
+## Each layer's folder is a command root, added ahead of its commandDirs whether or not it
+## exists yet (the host lists it on each request). Records the directories a config adds.
 class DirRecorder:
 	extends RefCounted
 	var dirs := PackedStringArray()
 
 	func add_default_dirs() -> void:
 		dirs.append("<defaults>")
+
+	func add_command_root(root: String) -> void:
+		dirs.append("root:" + root)
 
 	func add_command_dir(dir: String) -> void:
 		dirs.append(dir)
@@ -258,37 +261,55 @@ class DirRecorder:
 		pass
 
 
-func _dirs_added(cfg, command_folders: bool) -> PackedStringArray:
-	var host := DirRecorder.new()
-	cfg.add_commands_to(host, command_folders)
+## An older gdsh copy without add_command_root or add_default_dirs.
+class OldDirRecorder:
+	extends RefCounted
+	var dirs := PackedStringArray()
+
+	func add_command_dir(dir: String) -> void:
+		dirs.append(dir)
+
+	func add_command(_path: String, _name: String = "") -> void:
+		pass
+
+
+func _dirs_added(cfg, command_roots: bool, host = null) -> PackedStringArray:
+	if host == null:
+		host = DirRecorder.new()
+	cfg.add_commands_to(host, command_roots)
 	return host.dirs
 
 
-func test_commands_folder():
+func test_command_roots():
 	var root := ProjectSettings.globalize_path("user://mcp_sh_bridge_test_cfg")
-	var commands := root.path_join("godot").path_join(BridgeConfig.COMMANDS_DIR)
-	var lib := root.path_join("godot").path_join("lib")
+	var layer := root.path_join("godot")
+	var commands := layer.path_join(BridgeConfig.COMMANDS_DIR)
+	var lib := layer.path_join("lib")
+	var project := BridgeConfig.project_path().get_base_dir()
 	var previous := OS.get_environment("MCP_SH_CONFIG_DIR")
 	OS.set_environment("MCP_SH_CONFIG_DIR", root)
-	var missing := _dirs_added(BridgeConfig.load_config(), true)
+	var before := _dirs_added(BridgeConfig.load_config(), true)
 	DirAccess.make_dir_recursive_absolute(commands)
-	var file := FileAccess.open(root.path_join("godot").path_join(BridgeConfig.FILE_NAME), FileAccess.WRITE)
-	file.store_string(JSON.stringify({"commandDirs": ["lib"]}))
+	var file := FileAccess.open(layer.path_join(BridgeConfig.FILE_NAME), FileAccess.WRITE)
+	file.store_string(JSON.stringify({"commandDirs": ["lib"], "newCommands": "gdsh"}))
 	file.close()
 	var cfg = BridgeConfig.load_config()
 	OS.set_environment("MCP_SH_CONFIG_DIR", previous)
-	DirAccess.remove_absolute(root.path_join("godot").path_join(BridgeConfig.FILE_NAME))
+	var old_host := _dirs_added(cfg, true, OldDirRecorder.new())
+	DirAccess.remove_absolute(layer.path_join(BridgeConfig.FILE_NAME))
 	DirAccess.remove_absolute(commands)
-	DirAccess.remove_absolute(root.path_join("godot"))
+	DirAccess.remove_absolute(layer)
 	DirAccess.remove_absolute(root)
-	if commands in missing:
-		return "a missing commands folder was added: %s" % missing
+	if before != PackedStringArray(["<defaults>", "root:" + layer, "root:" + project]):
+		return "a missing layer folder is still a root: %s" % before
 	var plain := _dirs_added(cfg, false)
 	if plain != PackedStringArray([lib]):
-		return "without command_folders only commandDirs are added: %s" % plain
-	var with_folders := _dirs_added(cfg, true)
-	if with_folders != PackedStringArray(["<defaults>", commands, lib]):
-		return "with command_folders, gdsh's shared dirs, then the commands folder, then commandDirs: %s" % with_folders
+		return "without command_roots only commandDirs are added: %s" % plain
+	var with_roots := _dirs_added(cfg, true)
+	if with_roots != PackedStringArray(["<defaults>", "root:" + layer, lib, "root:" + project]):
+		return "with command_roots: gdsh's defaults, then each layer's root and commandDirs: %s" % with_roots
+	if old_host != PackedStringArray([commands, lib]):
+		return "an older gdsh gets the commands/ folders that exist: %s" % old_host
 	if cfg.command_dirs != PackedStringArray([lib]):
 		return "command_dirs holds only bridge.json's commandDirs: %s" % cfg.command_dirs
 	return ""
