@@ -314,9 +314,10 @@ func _handle_request(req:Dictionary, peer:StreamPeerTCP = null) -> Dictionary:
 
 ## Cancellation for host_run: mcp-sh's per-command deadline and output cap when it sends them,
 ## and the client hanging up (it closes the connection when it gives up). A host checks these
-## at its checkpoints; nothing times out unless the request asks.
+## at its checkpoints; nothing times out unless the request asks. host_name sets $GDSH_HOST
+## (gdsh 0.5.4+; older hosts ignore it).
 func _run_options(req:Dictionary, peer:StreamPeerTCP) -> Dictionary:
-	var opts := {}
+	var opts := {"host_name": "mcp"}
 	var timeout_ms := int(req.get("timeout_ms", 0))
 	if timeout_ms > 0:
 		opts["timeout_ms"] = timeout_ms
