@@ -44,6 +44,9 @@ const _READ_CHUNK := 65536
 ## A GDSh.Host, or any object with host_commands(), host_help(name) and host_run(argv, stdin).
 ## A Callable returning one is resolved per request. Null: default_host() when listening starts.
 var host = null
+## What serves this bridge and its version, e.g. "mcp-sh-godot 0.2.4". Added to the hello's
+## version, so `mcp_sh_godot --version` shows it.
+var server_label:String = ""
 ## 0: 9510 in the editor, 9511 in a running game. -1: any free port; get_port() says which.
 @export var port:int = 0
 @export var token:String = ""
@@ -144,6 +147,14 @@ func bridge_version() -> String:
 	if cfg.load(PACKAGE_CFG) != OK:
 		return "unknown"
 	return str(cfg.get_value("package", "version", "unknown"))
+
+
+## Godot's version, the bridge's, and server_label when set.
+func _hello_version() -> String:
+	var v := "%s, bridge %s" % [Engine.get_version_info().get("string", ""), bridge_version()]
+	if not server_label.is_empty():
+		v += ", " + server_label
+	return v
 
 
 ## Plain gdsh, its builtins only, with `host_data` hooks for every request (see GDSh.Host).
@@ -262,7 +273,7 @@ func _handle_request(req:Dictionary, peer:StreamPeerTCP = null) -> Dictionary:
 			return {
 				"id": id,
 				"name": "godot " + state(),
-				"version": "%s, bridge %s" % [Engine.get_version_info().get("string", ""), bridge_version()],
+				"version": _hello_version(),
 				"protocol": PROTOCOL,
 				"commands": _command_list(current),
 			}
